@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  mcp_server:
+    build: 
+      context: . # Build context is the root directory
+      dockerfile: src/mcp_server/Dockerfile # Specify Dockerfile location
+    env_file:
+      - .env # Load environment variables from .env file
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src:/app/src # Mount the src directory for live code changes (optional)
+      # Example: Mount a config directory if needed
+      # - ./config:/app/config 
+    depends_on:
+      - lean_engine # Ensure lean_engine starts first (optional dependency)
+
+  lean_engine:
+    image: quantconnect/lean:latest
+    volumes:
+      - ./src/strategies:/Lean/Strategies # Mount strategies directory
+      # Add other necessary LEAN volumes, e.g., data
+      # - ./data:/Lean/Data
+    # Add ports or environment variables for LEAN if needed 

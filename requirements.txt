@@ -1,0 +1,6 @@
+mcp-sdk
+google-generativeai
+python-dotenv
+# Add other specific dependencies if known, e.g.:
+# requests
+# pytest 
