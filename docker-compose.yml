@@ -15,6 +15,13 @@ services:
       # - ./config:/app/config 
     depends_on:
       - lean_engine # Ensure lean_engine starts first (optional dependency)
+    environment:
+      - QC_USER_ID=${QC_USER_ID}
+      - QC_API_TOKEN=${QC_API_TOKEN}
+
+    volume:
+      - ./src:/app/src # Mount the src directory for live code changes (optional)
+      - ./.lean:/root/.lean  # Store LEAN CLI config
 
   lean_engine:
     image: quantconnect/lean:latest

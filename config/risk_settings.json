@@ -1,0 +1,8 @@
+{
+    "max_position_size": 100000,
+    "max_drawdown_percent": 5,
+    "allowed_symbols": ["SPY", "QQQ", "AAPL", "GOOG", "BTCUSD", "ETHUSD"],
+    "default_stop_loss_percent": 2,
+    "default_take_profit_percent": 5,
+    "max_trades_per_day": 10
+} 

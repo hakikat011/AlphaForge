@@ -61,6 +61,12 @@ def parse_gemini_response(user_input: str) -> dict:
                 # Fallback or raise error
                 raise ValueError("Parsed JSON is not a valid dictionary or missing 'action' key.")
             
+            # Ensure required fields for cloud deployment
+            required_fields = ["action", "symbols", "strategy_type"]
+            missing_fields = [field for field in required_fields if field not in parsed_json]
+            if missing_fields:
+                raise ValueError(f"Missing required fields for cloud deployment: {missing_fields}")
+            
             return parsed_json
             
         except json.JSONDecodeError as e:

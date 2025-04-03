@@ -1,59 +1,84 @@
 from mcp import McpServer, Tool, Resource
+from mcp.security import OAuth2Authenticator # Import authenticator directly
 from .bridge import LeanBridge
-# Removed unused Resource import
+from ..integrations.qc_cloud import QuantConnectCloudBridge
+# Import the new tools and resources classes
+from .tools import TradingTools, TradingResources
 
 class AlphaForgeServer(McpServer):
     def __init__(self):
-        # Added authenticator initialization from security baseline
-        from mcp.security import OAuth2Authenticator
         super().__init__(name="AlphaForge v1.0")
+        
+        # Initialize tools and resources first
+        self.trading_tools = TradingTools()
+        self.trading_resources = TradingResources()
+        
+        # Initialize other components
+        self.lean = LeanBridge() # Local LEAN bridge (if used)
+        self.qc_cloud = self.trading_tools.qc_bridge # Use the instance from TradingTools
+        
+        # Configure authenticator
         self.authenticator = OAuth2Authenticator(
-            allowed_domains=["quantconnect.com"], 
-            auto_approve_tools=["backtest_strategy"]
+            allowed_domains=["quantconnect.com"], # Example domain
+            # Update tools approved for auto-run if needed
+            auto_approve_tools=["cloud_backtest", "push_project", "download_market_data"]
         )
-        self.lean = LeanBridge()
+        
+        # Register tools and resources
         self.register_tools()
+        self.register_resources() # Call the new method
 
     def register_tools(self):
+        """Registers tools available on the server."""
+        # Define the original local backtest tool (if still needed)
         @Tool(
-            name="backtest_strategy",
-            description="Run LEAN backtest from natural language input",
+            name="local_backtest_strategy", # Renamed to avoid conflict
+            description="Run LEAN backtest LOCALLY from natural language input",
             params={"strategy_description": "str"}
         )
-        async def backtest(_, strategy_description: str):
-            # Step 1: Parse Gemini input
-            # Corrected import path relative to server.py
+        async def local_backtest(_, strategy_description: str):
             from ..nlp.gemini_parser import parse_gemini_response 
             config = parse_gemini_response(strategy_description)
             
-            # Step 2: Execute LEAN - Placeholder, needs actual strategy logic
-            # The config currently contains placeholders
-            # We need a way to map config to an actual LEAN command/file
-            # Example: Assume config['algorithm_path'] is generated or mapped
-            # For v1, let's assume a fixed path or a simple mapping logic
-            # This part requires further definition based on Gemini output and LEAN setup
-            algorithm_path = config.get('algorithm_path', 'BasicTemplateAlgorithm') # Default or derived path
-            lean_command = f"backtest {algorithm_path}" 
-            # Example: Add parameters if needed: --start-date {config['start_date']}
+            # Simplified example: Assume parser gives a path or name
+            algorithm_identifier = config.get('algorithm_path', config.get('strategy_type', 'BasicTemplateAlgorithm'))
+            lean_command = f"backtest {algorithm_identifier}" 
 
-            print(f"Executing LEAN command: {lean_command}") # Logging
+            print(f"Executing LOCAL LEAN command: {lean_command}")
             result = await self.lean.execute(lean_command)
-            print(f"LEAN execution result: {result}") # Logging
+            print(f"LOCAL LEAN execution result: {result}")
 
-            # Step 3: Format and return result (needs refinement)
-            # The example output format doesn't match the LeanBridge output
-            # Adapt this based on actual needs
             return {
                 "status": "success" if result.get("success") else "error",
-                # Placeholder for actual results processing
                 "details": result.get("output") or result.get("error") 
             }
-            
-        self.add_tools([backtest])
+
+        # Get tools from the TradingTools instance
+        trading_tool_methods = [
+            self.trading_tools.cloud_backtest,
+            self.trading_tools.push_project,
+            self.trading_tools.download_data
+            # Add self.trading_tools.deploy_live here when implemented
+        ]
+        
+        # Combine local tools (if any) and trading tools
+        all_tools = [local_backtest] + trading_tool_methods
+        self.add_tools(all_tools)
+        print(f"Registered tools: {[tool.name for tool in all_tools]}")
+
+    def register_resources(self):
+        """Registers resources available on the server."""
+        resources_list = [
+            self.trading_resources.cloud_projects,
+            self.trading_resources.risk_parameters
+        ]
+        self.add_resources(resources_list)
+        print(f"Registered resources: {[res.name for res in resources_list]}")
+
 
 if __name__ == "__main__":
     print("Starting AlphaForge v1.0 MCP Server...")
     server = AlphaForgeServer()
-    # Added authenticator to run method
-    server.run(host="0.0.0.0", port=8080, authenticator=server.authenticator) 
+    # Run the server with the authenticator
+    server.run(host="0.0.0.0", port=8080, authenticator=server.authenticator)
     print("AlphaForge v1.0 MCP Server stopped.") 

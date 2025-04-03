@@ -129,6 +129,52 @@ class QuantConnectCloudBridge:
         print(f"Deploying project {project_name_or_id} to {environment_name} (Not Implemented)")
         return await self._execute_lean_command(command) # Example execution
 
+    async def get_project_status(self, project_name_or_id: str) -> dict:
+        """Get the current status of a cloud project."""
+        safe_project_arg = shlex.quote(project_name_or_id)
+        command = f"cloud status {safe_project_arg}"
+        return await self._execute_lean_command(command)
+
+    async def create_project(self, project_name: str, language: str = "python") -> dict:
+        """
+        Create a new project in QuantConnect Cloud.
+        
+        Args:
+            project_name: Name for the new project
+            language: 'python' or 'csharp' (default: 'python')
+        """
+        safe_name = shlex.quote(project_name)
+        command = f"project-create {safe_name} --language {language}"
+        return await self._execute_lean_command(command)
+
+    async def get_backtest_status(self, project_name_or_id: str, backtest_id: str) -> dict:
+        """
+        Check the status of a running backtest.
+        This complements submit_cloud_backtest for monitoring progress.
+        """
+        safe_project_arg = shlex.quote(project_name_or_id)
+        command = f"cloud status {safe_project_arg} --backtest-id {shlex.quote(backtest_id)}"
+        return await self._execute_lean_command(command)
+
+    async def list_projects(self) -> dict:
+        """
+        (Placeholder) List projects available in the QuantConnect Cloud account.
+        LEAN CLI command might be 'lean cloud list' or similar, needs verification.
+        Alternatively, this might require using the QC Web API directly.
+        """
+        # Example using a potential CLI command (needs verification)
+        # command = "cloud list"
+        # return await self._execute_lean_command(command)
+
+        print("Listing cloud projects (Not Implemented - Returning placeholder)")
+        # Placeholder implementation
+        return {
+            "success": True,
+            "output": "Placeholder: Project A, Project B",
+            "projects": [{"name": "Project A", "id": 123}, {"name": "Project B", "id": 456}],
+            "error": ""
+        }
+
 # Example Usage (can be run directly for testing if needed)
 # if __name__ == '__main__':
 #     async def main():

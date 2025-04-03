@@ -10,6 +10,13 @@ COPY requirements.txt .
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install LEAN CLI
+RUN pip install --no-cache-dir lean
+
+# Add initialization script
+COPY scripts/init-lean.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/init-lean.sh
+
 # Copy the application source code into the container
 # Copying the entire context might be too broad if build context is '.'
 # Consider copying only the necessary parts if context is '.'
@@ -23,4 +30,4 @@ EXPOSE 8080
 
 # Define the command to run the application
 # Use the module path relative to WORKDIR
-CMD ["python", "-m", "src.mcp_server.server"] 
+CMD ["/bin/bash", "-c", "init-lean.sh && python -m src.mcp_server.server"] 
