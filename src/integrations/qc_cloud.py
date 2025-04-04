@@ -138,7 +138,7 @@ class QuantConnectCloudBridge:
     async def create_project(self, project_name: str, language: str = "python") -> dict:
         """
         Create a new project in QuantConnect Cloud.
-        
+
         Args:
             project_name: Name for the new project
             language: 'python' or 'csharp' (default: 'python')
@@ -158,20 +158,43 @@ class QuantConnectCloudBridge:
 
     async def list_projects(self) -> dict:
         """
-        (Placeholder) List projects available in the QuantConnect Cloud account.
-        LEAN CLI command might be 'lean cloud list' or similar, needs verification.
-        Alternatively, this might require using the QC Web API directly.
+        List projects available in the QuantConnect Cloud account.
+        Uses the LEAN CLI 'cloud projects' command.
         """
-        # Example using a potential CLI command (needs verification)
-        # command = "cloud list"
-        # return await self._execute_lean_command(command)
+        command = "cloud projects"
+        result = await self._execute_lean_command(command)
 
-        print("Listing cloud projects (Not Implemented - Returning placeholder)")
-        # Placeholder implementation
+        if not result["success"]:
+            print(f"Error listing projects: {result.get('error')}")
+            return {
+                "success": False,
+                "error": result.get('error', 'Unknown error listing projects'),
+                "projects": []
+            }
+
+        # Parse the output to extract project information
+        # Example output format:
+        # Project ID | Project Name
+        # 123456     | My Strategy
+        # 789012     | Another Strategy
+        projects = []
+        lines = result["output"].strip().split('\n')
+
+        # Skip header line if it exists
+        start_idx = 1 if len(lines) > 0 and ('Project ID' in lines[0] or 'ProjectId' in lines[0]) else 0
+
+        for line in lines[start_idx:]:
+            if '|' in line:
+                parts = line.split('|')
+                if len(parts) >= 2:
+                    project_id = parts[0].strip()
+                    project_name = parts[1].strip()
+                    projects.append({"id": project_id, "name": project_name})
+
         return {
             "success": True,
-            "output": "Placeholder: Project A, Project B",
-            "projects": [{"name": "Project A", "id": 123}, {"name": "Project B", "id": 456}],
+            "output": result["output"],
+            "projects": projects,
             "error": ""
         }
 
@@ -187,4 +210,4 @@ class QuantConnectCloudBridge:
 #         import json
 #         print(json.dumps(result, indent=2))
 #
-#     asyncio.run(main()) 
+#     asyncio.run(main())

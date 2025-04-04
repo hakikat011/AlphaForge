@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   mcp_server:
-    build: 
+    build:
       context: . # Build context is the root directory
       dockerfile: src/mcp_server/Dockerfile # Specify Dockerfile location
     env_file:
@@ -10,23 +10,23 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./src:/app/src # Mount the src directory for live code changes (optional)
-      # Example: Mount a config directory if needed
-      # - ./config:/app/config 
+      - ./src:/app/src # Mount the src directory for live code changes
+      - ./config:/app/config # Mount config directory
+      - ./.lean:/root/.lean  # Store LEAN CLI config
     depends_on:
-      - lean_engine # Ensure lean_engine starts first (optional dependency)
+      - lean_engine # Ensure lean_engine starts first
     environment:
       - QC_USER_ID=${QC_USER_ID}
       - QC_API_TOKEN=${QC_API_TOKEN}
-
-    volume:
-      - ./src:/app/src # Mount the src directory for live code changes (optional)
-      - ./.lean:/root/.lean  # Store LEAN CLI config
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - ALLOWED_SYMBOLS=${ALLOWED_SYMBOLS}
+      - QC_PROJECTS_DIR=${QC_PROJECTS_DIR}
 
   lean_engine:
     image: quantconnect/lean:latest
     volumes:
       - ./src/strategies:/Lean/Strategies # Mount strategies directory
-      # Add other necessary LEAN volumes, e.g., data
-      # - ./data:/Lean/Data
-    # Add ports or environment variables for LEAN if needed 
+      - ./data:/Lean/Data # Mount data directory
+    environment:
+      - QC_USER_ID=${QC_USER_ID}
+      - QC_API_TOKEN=${QC_API_TOKEN}

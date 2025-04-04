@@ -22,8 +22,21 @@ except Exception as e:
 def parse_gemini_response(user_input: str) -> dict:
     """Uses Gemini to parse user input into a structured JSON config."""
     try:
+        # Check if API key is available
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key or api_key == "your_gemini_api_key":
+            print("Warning: GEMINI_API_KEY not properly configured in .env file")
+            return {
+                "error": "Gemini API key not configured",
+                "message": "Please set a valid GEMINI_API_KEY in your .env file",
+                "action": "backtest",
+                "symbols": ["SPY"],
+                "start_date": "2020-01-01",
+                "strategy_type": "mean_reversion"
+            }
+
         model = genai.GenerativeModel('gemini-pro')
-        
+
         # Improved prompt with clearer instructions and example
         prompt = f"""
         [SYSTEM] You are a helpful assistant that converts natural language trading strategy requests into a structured JSON format suitable for the LEAN engine. Focus on extracting key parameters for backtesting.
@@ -37,38 +50,82 @@ def parse_gemini_response(user_input: str) -> dict:
         Example:
         USER: Backtest a simple moving average crossover on SPY from 2021-01-01 to 2023-12-31 using 50 and 200 day SMAs.
         JSON_OUTPUT: {{"action":"backtest", "strategy_details": "simple moving average crossover using 50 and 200 day SMAs", "symbols": ["SPY"], "start_date": "2021-01-01", "end_date": "2023-12-31", "strategy_type": "moving_average_crossover", "parameters": {{ "short_window": 50, "long_window": 200 }} }}
-        
+
         Now, process the actual user input:
         USER: {user_input}
         JSON_OUTPUT:
         """
-        
+
         print(f"Sending prompt to Gemini:\n{prompt}") # Log the prompt
-        response = model.generate_content(prompt)
-        
-        print(f"Raw Gemini Response Text:\n{response.text}") # Log the raw response
+
+        try:
+            response = model.generate_content(prompt)
+            print(f"Raw Gemini Response Text:\n{response.text}") # Log the raw response
+        except Exception as api_error:
+            print(f"Error calling Gemini API: {api_error}")
+            return {
+                "error": "Gemini API call failed",
+                "message": str(api_error),
+                "action": "backtest",
+                "symbols": ["SPY"],
+                "start_date": "2020-01-01",
+                "strategy_type": "mean_reversion"
+            }
 
         # Attempt to parse the response text as JSON
         try:
-            # Basic cleaning: remove potential backticks and language identifiers
-            cleaned_response_text = response.text.strip().strip("`json\n`").strip("`")
+            # Extract JSON from response - handle various formats
+            cleaned_response_text = response.text.strip()
+
+            # Remove markdown code block markers if present
+            if cleaned_response_text.startswith("```") and cleaned_response_text.endswith("```"):
+                # Remove the first and last lines (```json and ```)
+                lines = cleaned_response_text.split('\n')
+                cleaned_response_text = '\n'.join(lines[1:-1])
+
+            # Remove any other backticks or language identifiers
+            cleaned_response_text = cleaned_response_text.strip("`json\n`").strip("`")
+
+            # Try to find JSON in the response if it's not properly formatted
+            if not cleaned_response_text.startswith("{"):
+                # Look for the start of JSON
+                json_start = cleaned_response_text.find("{")
+                json_end = cleaned_response_text.rfind("}")
+                if json_start >= 0 and json_end > json_start:
+                    cleaned_response_text = cleaned_response_text[json_start:json_end+1]
+
             parsed_json = json.loads(cleaned_response_text)
             print(f"Successfully parsed JSON: {parsed_json}")
-            
+
             # Basic validation (can be expanded)
-            if not isinstance(parsed_json, dict) or "action" not in parsed_json:
-                print("Warning: Parsed JSON might be invalid or incomplete.")
-                # Fallback or raise error
-                raise ValueError("Parsed JSON is not a valid dictionary or missing 'action' key.")
-            
-            # Ensure required fields for cloud deployment
-            required_fields = ["action", "symbols", "strategy_type"]
-            missing_fields = [field for field in required_fields if field not in parsed_json]
-            if missing_fields:
-                raise ValueError(f"Missing required fields for cloud deployment: {missing_fields}")
-            
+            if not isinstance(parsed_json, dict):
+                raise ValueError("Parsed JSON is not a valid dictionary")
+
+            # Add action if missing
+            if "action" not in parsed_json:
+                parsed_json["action"] = "backtest"
+                print("Added missing 'action' field with default value 'backtest'")
+
+            # Ensure symbols is a list
+            if "symbols" in parsed_json and not isinstance(parsed_json["symbols"], list):
+                if isinstance(parsed_json["symbols"], str):
+                    parsed_json["symbols"] = [parsed_json["symbols"]]
+                    print(f"Converted 'symbols' from string to list: {parsed_json['symbols']}")
+
+            # Add default values for missing required fields
+            required_fields = {
+                "symbols": ["SPY"],
+                "strategy_type": "mean_reversion",
+                "start_date": "2020-01-01"
+            }
+
+            for field, default_value in required_fields.items():
+                if field not in parsed_json:
+                    parsed_json[field] = default_value
+                    print(f"Added missing '{field}' field with default value: {default_value}")
+
             return parsed_json
-            
+
         except json.JSONDecodeError as e:
             print(f"Error decoding Gemini response JSON: {e}")
             print(f"Problematic response text: {response.text}")
@@ -76,21 +133,27 @@ def parse_gemini_response(user_input: str) -> dict:
             return {
                 "error": "Failed to parse Gemini response as JSON",
                 "raw_response": response.text,
-                # Include placeholders based on the original v1 implementation
                 "action": "backtest",
-                "symbols": ["SPY"],  
+                "symbols": ["SPY"],
                 "start_date": "2020-01-01",
                 "strategy_type": "mean_reversion"
             }
         except Exception as e:
             print(f"An unexpected error occurred during JSON parsing: {e}")
-            return {"error": f"Unexpected JSON parsing error: {str(e)}", "raw_response": response.text}
+            return {
+                "error": f"Unexpected JSON parsing error: {str(e)}",
+                "raw_response": response.text,
+                "action": "backtest",
+                "symbols": ["SPY"],
+                "start_date": "2020-01-01",
+                "strategy_type": "mean_reversion"
+            }
 
     except AttributeError:
          # Handle cases where the response object doesn't have the expected structure
         print(f"Error: Unexpected response structure from Gemini API.")
         try:
-            print(f"Full Gemini Response object: {response}") 
+            print(f"Full Gemini Response object: {response}")
         except NameError:
              print("Gemini response object not available.")
         return {"error": "Unexpected response structure from Gemini API."}
@@ -112,4 +175,4 @@ if __name__ == "__main__":
     test_input_complex = "I want to backtest a mean reversion strategy for AAPL and GOOG, using a 20-day lookback period, from the start of 2021 until today."
     print(f"\nTesting with complex input: {test_input_complex}")
     result_complex = parse_gemini_response(test_input_complex)
-    print(f"\nFinal Parsed Result (Complex):\n{json.dumps(result_complex, indent=2)}") 
+    print(f"\nFinal Parsed Result (Complex):\n{json.dumps(result_complex, indent=2)}")
